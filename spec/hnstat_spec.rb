@@ -47,4 +47,18 @@ describe "HNStat" do
       tweet.created_at.should be_a(Time)
     end
   end
+
+  describe HNStat::Firehose do
+    let(:hose) {HNStat::Firehose.new}
+    pending "fetches tweets" do
+      pp hose.tweets
+    end
+  end
+
+  describe HNStat::DB do
+    let(:db) { HNStat::DB.new }
+    pending "has a mongodb instance" do
+      db.mongo.should be_a(Mongo::DB)
+    end
+  end
 end
