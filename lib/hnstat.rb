@@ -99,7 +99,7 @@ class HNStat::DB
     # map id to _id
     tweets = tweets.map { |tweet|
       tweet["_id"] = tweet["id"]
-      tweet["created_at"] = Time.parse tweet["created_at"]
+      tweet["created_at"] = Time.parse(tweet["created_at"]).to_i
       tweet
     }
     return tweets if tweets.empty?
