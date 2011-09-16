@@ -66,6 +66,20 @@ class HNStat::DB
     o["_id"]
   end
 
+  def begin_time
+    o = newest
+    o && Time.at(o["created_at"])
+  end
+
+  def end_time
+    o = oldest
+    o && Time.at(o["created_at"]) 
+  end
+  
+  def time_range
+    [begin_time,end_time]
+  end
+  
   def newest
     tweets.find_one({})
   end
@@ -73,6 +87,26 @@ class HNStat::DB
   def oldest
     tweets.find_one({},:sort => [["_id",Mongo::ASCENDING]])
   end
+
+  # load multiples of 200
+  def load(count)
+    ((count / 200) + 1).times do
+      self.load_older
+    end
+  end
+
+  # def load_until(time)
+  #   goal = time
+  #   cursor = end_time || Time.now
+  #   loop do
+  #     break if cursor < goal
+  #     load_older
+  #     cursor = end_time
+  #     puts "at: #{end_time}"
+  #     puts "count: #{self.count}"
+  #     puts
+  #   end
+  # end
   
   # check to see if there is anything new
   def load_newer(count=200)
