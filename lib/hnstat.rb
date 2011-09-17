@@ -3,6 +3,24 @@ require "multi_json"
 require 'rest_client'
 
 class HNStat
+  include Let
+  def initialize
+  end
+
+  def expand_urls
+    tweets = tweets_for_url_expand.each do |data|
+      tweet = HNStat::Tweet.new(data)
+      full_url = UrlExpander::Client.expand(tweet.url)
+      p [:expand,tweet.url,full_url]
+      db.tweets.update({"_id" => tweet.id},{"full_url" => full_url})
+    end
+  end
+
+  def tweets_for_url_expand
+    db.tweets.find({"full_url" => {"$exists" => false}})
+  end
+
+  let(:db) { HNStat::DB.new }
 end
 
 class HNStat::Firehose
@@ -172,24 +190,58 @@ end
 # how should I treat repeated submission?
 # what questions do I want to ask?
 ## it would be interesting to find the correlation of votes between for the same url
-class HNStat::API
-  "http://api.ihackernews.com/"
+class HNStat::HackerNews
+  API = "http://api.ihackernews.com/"
 
-  # Find submitted articles by URL
-  # http://api.ihackernews.com/getid?url={url}
+  attr_reader :tweet
+  def initialize(tweet)
+    @tweet = tweet
+  end
 
-  # Retrieve Post (includes url, title, comments, etc...)
-  # http://api.ihackernews.com/post/{id}
+  # list of possible ids
+  def ids 
+    get("/getid",:url => tweet.url)
+  end
+
+  # select a matching id
+  def id 
+  end
+
+  def data
+    # Retrieve Post (includes url, title, comments, etc...)
+    # http://api.ihackernews.com/post/{id}
+    get("/post/#{self.id}")
+  end
+
+  def get(path,params)
+    r = RestClient.get "#{API}#{path}", {:params => params, :accept => :json}
+    # r.cookies
+    # r.headers
+    # r code
+    MultiJson.decode r.to_str
+  end
 end
 
 class HNStat::Tweet
   include Let
-  attr_reader :data
+
+  attr_reader :data, :hn
 
   def initialize(data)
     @data = data
+    # @hn = HNStat::API.new
   end
 
+  def text
+    data["text"]
+  end
+
+  def id
+    data["_id"]
+  end
+
+  let(:url) { urls.first }
+  
   let(:urls) {
     data["entities"]["urls"].map { |h| h["expanded_url"] }
   }
