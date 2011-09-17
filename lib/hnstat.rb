@@ -2,25 +2,63 @@ require 'let'
 require "multi_json"
 require 'rest_client'
 
-class HNStat
+module HNStat extend self
   include Let
-  def initialize
+  let(:db) { HNStat::DB.new }
+  def tweets
+    db.tweets
   end
+end
 
-  def expand_urls
-    tweets = tweets_for_url_expand.each do |data|
-      tweet = HNStat::Tweet.new(data)
-      full_url = UrlExpander::Client.expand(tweet.url)
-      p [:expand,tweet.url,full_url]
-      db.tweets.update({"_id" => tweet.id},{"full_url" => full_url})
+class HNStat::URLExpander
+  require 'url_expander'
+  require 'resque'
+
+  include Let
+  
+  @queue = :url_expand
+  
+  class << self
+    def tweets_to_expand(opts={})
+      db.tweets.find({"full_url" => {"$exists" => false}},opts)
+    end
+
+    def expand(count=nil)
+      tweets_to_expand(:limit => count).each do |data|
+        Resque.enqueue(HNStat::URLExpander,data)
+      end
+    end
+
+    def perform(data)
+      self.new(data).expand!
+    end
+
+    def db
+      @db ||= HNStat::DB.new
     end
   end
-
-  def tweets_for_url_expand
-    db.tweets.find({"full_url" => {"$exists" => false}})
+  
+  attr_reader :tweet
+  def initialize(data)
+    @tweet = HNStat::Tweet.new(data)
   end
 
-  let(:db) { HNStat::DB.new }
+  let(:full_url) {
+    UrlExpander::Client.expand(tweet.url, :is_redirection => true)
+  }
+
+  def url
+    tweet.url
+  end
+  
+  def expand!
+    p [:expand,url,full_url]
+    db.tweets.update({"_id" => tweet.id},{"$set" => {"full_url" => full_url}})
+  end
+  
+  def db
+    HNStat::URLExpander.db
+  end
 end
 
 class HNStat::Firehose
@@ -243,7 +281,7 @@ class HNStat::Tweet
   let(:url) { urls.first }
   
   let(:urls) {
-    data["entities"]["urls"].map { |h| h["expanded_url"] }
+    data["entities"]["urls"].map { |h| h["expanded_url"] || h["url"] }
   }
 
   let(:created_at) {
