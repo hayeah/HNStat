@@ -18,16 +18,10 @@ module HNStat extend self
   end
 end
 
-require 'hnstat/url_expander'
-require 'hnstat/firehose'
-require 'hnstat/db'
-require 'hnstat/api'
-require 'hnstat/tweet'
-
-
-
-
-
-
-
-
+["url_expander","firehose","db","api","post_time","tweet"].each do |m|
+  if debug = false
+    load "hnstat/#{m}.rb"
+  else
+    require "hnstat/#{m}"
+  end
+end
