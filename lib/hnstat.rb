@@ -81,18 +81,35 @@ class HNStat::DB
   end
   
   def newest
-    tweets.find_one({})
+    tweets.find_one({},:sort => [["_id",Mongo::DESCENDING]])
   end
 
   def oldest
     tweets.find_one({},:sort => [["_id",Mongo::ASCENDING]])
   end
 
-  # load multiples of 200
-  def load(count)
-    ((count / 200) + 1).times do
-      self.load_older
+  # load multiples of 200 from head until it catches up with what there is in the database.
+  def update!(oldest_result = nil)
+    # load until there's nothing to load, or we've already reached the end.
+    puts "load until #{newest_known_id}"
+    loop do
+      if oldest_result
+        params = {:count => 200, :max_id => oldest_result["id"]-1}
+      else
+        params = {:count => 200}
+      end
+      
+      results = hose.tweets(params)
+      break if results.empty? # stop when no tweets are found
+
+      pp [:saving,results.first["id"],results.last["id"]]
+      oldest_result = results.last
+      overlapped = true if self.tweets.find_one({"_id" => oldest_result["id"]})
+      store_tweets results # the tail is already in the db, but there may be other tweets we haven't stored yet
+      puts "count: #{self.count}..."
+      break if overlapped # stop when the end of this batch of tweet is already in database
     end
+    puts "now at #{newest_known_id}"
   end
 
   # def load_until(time)
@@ -137,7 +154,9 @@ class HNStat::DB
       tweet
     }
     return tweets if tweets.empty?
-    self.tweets.insert(tweets)
+    tweets.each do |tweet|
+      self.tweets.save(tweet)
+    end
     tweets
   end
 
@@ -176,7 +195,7 @@ class HNStat::Tweet
   }
 
   let(:created_at) {
-    Time.parse data["created_at"]
+    Time.at data["created_at"]
   }
 end
 
