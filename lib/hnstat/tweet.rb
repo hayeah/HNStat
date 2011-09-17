@@ -25,4 +25,12 @@ class HNStat::Tweet
   let(:created_at) {
     Time.at data["created_at"]
   }
+
+  def set(field,value)
+    tweets.update({"_id" => id},{"$set" => {field => value}})
+  end
+  
+  def tweets
+    HNStat.tweets
+  end
 end

@@ -19,7 +19,7 @@ module HNStat extend self
 end
 
 ["url_expander","firehose","db","api","post_time","tweet"].each do |m|
-  if debug = false
+  if debug = true
     load "hnstat/#{m}.rb"
   else
     require "hnstat/#{m}"

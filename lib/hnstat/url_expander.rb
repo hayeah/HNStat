@@ -7,12 +7,12 @@ class HNStat::URLExpander
   @queue = :url_expand
   
   class << self
-    def tweets_to_expand(opts={})
+    def to_process(opts={})
       db.tweets.find({"full_url" => {"$exists" => false}},opts)
     end
 
     def expand(count=nil)
-      tweets_to_expand(:limit => count).each do |data|
+      to_process(:limit => count).each do |data|
         Resque.enqueue(HNStat::URLExpander,data)
       end
     end
@@ -41,7 +41,7 @@ class HNStat::URLExpander
   
   def expand!
     p [:expand,url,full_url]
-    db.tweets.update({"_id" => tweet.id},{"$set" => {"full_url" => full_url}})
+    tweet.set("full_url",full_url)
   end
   
   def db
